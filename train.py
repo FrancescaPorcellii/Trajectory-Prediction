@@ -1,76 +1,129 @@
 import torch
-from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+import numpy as np
+import torch.optim as optim
+import matplotlib.pyplot as plt
+from torch.utils.data import DataLoader, random_split
+import argparse
+import json
 
 class TrajectoryDataset(Dataset):
-    def __init__(self, sequences, pred_horizon=1):
-        """
-        sequences: lista di numpy array shape (seq_len, feature_dim)
-        pred_horizon: quanti passi in avanti voglio predire (es 1 = prossimo frame)
-        """
-        self.sequences = sequences
-        self.pred_horizon = pred_horizon
+    def __init__(self, samples):
+        self.samples = samples
 
     def __len__(self):
-        return len(self.sequences)
+        return len(self.samples)
 
     def __getitem__(self, idx):
-        seq = self.sequences[idx]  # (seq_len, feature_dim)
-        seq_len = seq.shape[0]
-
-        # Input: tutti tranne gli ultimi pred_horizon step
-        input_seq = seq[:seq_len - self.pred_horizon, :]
-
-        # Target: le posizioni future x,y,z degli ultimi pred_horizon step
-        # Qui assumiamo le posizioni sono prime 3 feature (x,y,z)
-        target_seq = seq[seq_len - self.pred_horizon:, 0:3]
-
-        return torch.tensor(input_seq, dtype=torch.float32), torch.tensor(target_seq, dtype=torch.float32)
-
+        x, y, ann_tokens_window = self.samples[idx]
+        return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), ann_tokens_window
 
 class TrajectoryLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size=64, num_layers=1, output_size=3):
+    def __init__(self, input_size=2, hidden_size=16, num_layers=4, pred_len=7):
         super().__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.pred_len = pred_len
+        self.dropout = nn.Dropout(0.3)
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, output_size)
+        self.fc = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_size // 2, 2)
+        )
 
     def forward(self, x):
-        # x shape: (batch, seq_len, input_size)
-        out, _ = self.lstm(x)
-        # prendiamo l'output solo dell'ultimo step temporale
-        out = out[:, -1, :]
-        out = self.fc(out)
-        return out  # predizione posizione (x,y,z)
+        batch_size = x.size(0)
+        h = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
+        c = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(x.device)
+
+        _, (h, c) = self.lstm(x, (h, c))
+
+        last_output = x[:, -1, :].unsqueeze(1)
+        preds = []
+
+        for _ in range(self.pred_len):
+            out, (h, c) = self.lstm(last_output, (h, c))
+            out = self.dropout(out)  
+            pred = self.fc(out.squeeze(1))
+            preds.append(pred)
+            last_output = pred.unsqueeze(1)
+
+        return torch.stack(preds, dim=1)
 
 
-# Hyperparametri
-input_size = 9   # come da feature vettore (x,y,z + size + velocity)
-hidden_size = 64
-num_layers = 1
-output_size = 3  # prediciamo posizione (x,y,z)
-learning_rate = 0.001
-batch_size = 32
-epochs = 10
+def is_augmented(frame):
+    # Se frame è una stringa, controlla se termina con '_'
+    if isinstance(frame, str):
+        return frame.endswith('_')
+    # Se frame è un dict e ha un campo rilevante per la verifica (es. 'token' o simile)
+    elif isinstance(frame, dict):
+        # Sostituisci 'token' con la chiave giusta se diverso
+        token = frame.get('token', '')
+        return isinstance(token, str) and token.endswith('_')
+    # Altrimenti, non è augmented
+    return False
 
-# Dataset e dataloader
-dataset = TrajectoryDataset(all_sequences, pred_horizon=1)
-dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+def train_model(samples, num_epochs=40, batch_size=4, lr=0.001, device=None):
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    dataset = TrajectoryDataset(samples)
+    train_size = int(0.8 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-# Modello, loss, optimizer
-model = TrajectoryLSTM(input_size, hidden_size, num_layers, output_size)
-criterion = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-# Training
-for epoch in range(epochs):
-    total_loss = 0
-    for inputs, targets in dataloader:
-        optimizer.zero_grad()
-        outputs = model(inputs)  # (batch, 3)
-        loss = criterion(outputs, targets.squeeze(1))  # targets (batch, 3)
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item()
+    model = TrajectoryLSTM().to(device)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.MSELoss()
 
-    print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(dataloader):.4f}")
+    debug_predictions = []
 
+    for epoch in range(num_epochs):
+        model.train()
+        total_loss = 0.0
+
+        for batch in dataloader:
+            x, y, ann_tokens = batch
+            x, y = x.to(device), y.to(device)
+
+            optimizer.zero_grad()
+            pred = model(x)
+            loss = criterion(pred, y)
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+
+            if epoch == num_epochs - 1:
+                batch_size_actual = pred.shape[0]
+                for i in range(batch_size_actual):
+                    seq_ann_tokens = ann_tokens[i]  # lista di dict o stringhe per la sequenza i
+                    augmented = any(is_augmented(frame) for frame in seq_ann_tokens)
+                    if not augmented:
+                        debug_predictions.append({
+                            'input': x[i].detach().cpu().numpy().tolist(),
+                            'pred': pred[i].detach().cpu().numpy().tolist(),
+                            'gt': y[i].detach().cpu().numpy().tolist(),
+                            'ann_tokens': ann_tokens[i]
+                        })
+
+        avg_train_loss = total_loss / len(dataloader)
+
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for val_batch in val_dataloader:
+                x_val, y_val, _ = val_batch
+                x_val, y_val = x_val.to(device), y_val.to(device)
+                pred_val = model(x_val)
+                val_loss += criterion(pred_val, y_val).item()
+        avg_val_loss = val_loss / len(val_dataloader)
+
+        print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+    
+    return model, debug_predictions
