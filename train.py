@@ -1,12 +1,9 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 import numpy as np
 import torch.optim as optim
 import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader, random_split
-import argparse
-import json
 
 class TrajectoryDataset(Dataset):
     def __init__(self, samples):
@@ -16,11 +13,11 @@ class TrajectoryDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        x, y, ann_tokens_window = self.samples[idx]
-        return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), ann_tokens_window
+        x, y, ann_tokens_window, is_aug = self.samples[idx]
+        return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), ann_tokens_window, is_aug
 
 class TrajectoryLSTM(nn.Module):
-    def __init__(self, input_size=2, hidden_size=16, num_layers=4, pred_len=7):
+    def __init__(self, input_size=2, hidden_size=64, num_layers=2, pred_len=7):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -45,85 +42,117 @@ class TrajectoryLSTM(nn.Module):
 
         for _ in range(self.pred_len):
             out, (h, c) = self.lstm(last_output, (h, c))
-            out = self.dropout(out)  
+            out = self.dropout(out)
             pred = self.fc(out.squeeze(1))
             preds.append(pred)
             last_output = pred.unsqueeze(1)
 
         return torch.stack(preds, dim=1)
+def trajectory_length(traj):
+    diffs = np.diff(traj, axis=0)
+    dists = np.linalg.norm(diffs, axis=1)
+    return np.sum(dists)
+
+# ----------------------------
+# Setup
+# ----------------------------
+def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001):
+
+  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+  dataset = TrajectoryDataset(samples)
+  train_size = int(0.8 * len(dataset))
+  val_size = len(dataset) - train_size
+  train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+
+  dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+  val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+  model = TrajectoryLSTM().to(device)
+  optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-6)
+  criterion = nn.SmoothL1Loss()
+
+  # ----------------------------
+  # Training
+  # ----------------------------
+  for epoch in range(num_epochs):
+      model.train()
+      total_loss = 0.0
+
+      for batch in dataloader:
+          x, y, _, _ = batch
+          x, y = x.to(device), y.to(device)
+
+          optimizer.zero_grad()
+          pred = model(x)
+          loss = criterion(pred, y)
+          loss.backward()
+          optimizer.step()
+
+          total_loss += loss.item()
+
+      avg_train_loss = total_loss / len(dataloader)
+
+      model.eval()
+      val_loss = 0.0
+      with torch.no_grad():
+          for val_batch in val_dataloader:
+              x_val, y_val, _, _ = val_batch
+              x_val, y_val = x_val.to(device), y_val.to(device)
+              pred_val = model(x_val)
+              val_loss += criterion(pred_val, y_val).item()
+
+      avg_val_loss = val_loss / len(val_dataloader)
+      print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+
+  # ----------------------------
+  # Salvataggio predizioni finali (solo non augmentati)
+  # ----------------------------
+  #torch.save(model, 'model_full.pth')
 
 
-def is_augmented(frame):
-    # Se frame è una stringa, controlla se termina con '_'
-    if isinstance(frame, str):
-        return frame.endswith('_')
-    # Se frame è un dict e ha un campo rilevante per la verifica (es. 'token' o simile)
-    elif isinstance(frame, dict):
-        # Sostituisci 'token' con la chiave giusta se diverso
-        token = frame.get('token', '')
-        return isinstance(token, str) and token.endswith('_')
-    # Altrimenti, non è augmented
-    return False
+  #model = torch.load('/content/Trajectory-Prediction/model_full.pth')
 
-def train_model(samples, num_epochs=40, batch_size=4, lr=0.001, device=None):
-    if device is None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    dataset = TrajectoryDataset(samples)
-    train_size = int(0.8 * len(dataset))
-    val_size = len(dataset) - train_size
-    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+  debug_predictions = []
+  model.eval()
+  with torch.no_grad():
+      for input_seq, target_seq, ann_tokens, is_aug in samples:
+          if not is_aug:
+              x = torch.tensor(input_seq, dtype=torch.float32).unsqueeze(0).to(device)
+              y = torch.tensor(target_seq, dtype=torch.float32).unsqueeze(0).to(device)
+              pred = model(x)
+              debug_predictions.append({
+                  'input': input_seq.tolist(),
+                  'pred': pred[0].cpu().numpy().tolist(),
+                  'gt': target_seq.tolist(),
+                  'ann_tokens': ann_tokens
+              })
 
-    dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    model = TrajectoryLSTM().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.MSELoss()
 
-    debug_predictions = []
+  lengths = []
+  errors = []
 
-    for epoch in range(num_epochs):
-        model.train()
-        total_loss = 0.0
+  for pred in debug_predictions:
+      gt = np.array(pred['gt'])      # Ground truth trajectory (seq_len, 2)
+      pr = np.array(pred['pred'])    # Predicted trajectory (seq_len, 2)
 
-        for batch in dataloader:
-            x, y, ann_tokens = batch
-            x, y = x.to(device), y.to(device)
+      lengths.append(trajectory_length(gt))
+      errors.append(np.mean(np.linalg.norm(pr - gt, axis=1)))  # MAE per sequenza
 
-            optimizer.zero_grad()
-            pred = model(x)
-            loss = criterion(pred, y)
-            loss.backward()
-            optimizer.step()
+  avg_length = np.mean(lengths)
+  avg_mae = np.mean(errors)
 
-            total_loss += loss.item()
+  accuratezza_pct = (1 - (avg_mae / avg_length)) * 100
 
-            if epoch == num_epochs - 1:
-                batch_size_actual = pred.shape[0]
-                for i in range(batch_size_actual):
-                    seq_ann_tokens = ann_tokens[i]  # lista di dict o stringhe per la sequenza i
-                    augmented = any(is_augmented(frame) for frame in seq_ann_tokens)
-                    if not augmented:
-                        debug_predictions.append({
-                            'input': x[i].detach().cpu().numpy().tolist(),
-                            'pred': pred[i].detach().cpu().numpy().tolist(),
-                            'gt': y[i].detach().cpu().numpy().tolist(),
-                            'ann_tokens': ann_tokens[i]
-                        })
+  print(f"Lunghezza media traiettorie: {avg_length:.4f}")
+  print(f"MAE medio: {avg_mae:.4f}")
+  print(f"Accuratezza percentuale: {accuratezza_pct:.2f}%")
 
-        avg_train_loss = total_loss / len(dataloader)
-
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for val_batch in val_dataloader:
-                x_val, y_val, _ = val_batch
-                x_val, y_val = x_val.to(device), y_val.to(device)
-                pred_val = model(x_val)
-                val_loss += criterion(pred_val, y_val).item()
-        avg_val_loss = val_loss / len(val_dataloader)
-
-        print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
-    
-    return model, debug_predictions
+  # ----------------------------
+  # Verifica conteggio
+  # ----------------------------
+  expected = sum(1 for s in samples if not s[3])
+  actual = len(debug_predictions)
+  print(f"\nPredizioni salvate: {actual} / {expected} (non augmentati)\n")
+  assert actual == expected, "⚠️ Mismatch tra sample non augmentati e predizioni salvate!"
