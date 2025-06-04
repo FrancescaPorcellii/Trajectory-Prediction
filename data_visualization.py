@@ -157,7 +157,7 @@ def visualize_trajectory(trucksc, debug_preds, first_ann_token, mode="Ego"):
       for token in ann_tokens:
           ann = trucksc.get("sample_annotation", token)
           sample = trucksc.get("sample", ann['sample_token'])
-          print("sample",sample)
+          
           # Prendi il sample_data associato (es. camera)
           cam_token = sample['data'].get(cam_channel, None)
           if cam_token is None:
