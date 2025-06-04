@@ -108,7 +108,7 @@ def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001):
   # ----------------------------
   # Salvataggio predizioni finali (solo non augmentati)
   # ----------------------------
-  #torch.save(model, 'model_full.pth')
+  torch.save(model, 'model_full.pth')
 
 
   #model = torch.load('/content/Trajectory-Prediction/model_full.pth')
@@ -156,3 +156,4 @@ def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001):
   actual = len(debug_predictions)
   print(f"\nPredizioni salvate: {actual} / {expected} (non augmentati)\n")
   assert actual == expected, "⚠️ Mismatch tra sample non augmentati e predizioni salvate!"
+  return model, debug_predictions
