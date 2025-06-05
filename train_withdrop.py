@@ -4,6 +4,17 @@ from torch.utils.data import Dataset, DataLoader, random_split
 import numpy as np
 import torch.optim as optim
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
+
+def masked_smooth_l1(pred, target, mask):
+    """
+    pred, target : (B, pred_len, 2)
+    mask         : (B, pred_len)  True = valido
+    """
+    # estendi la maschera sull’asse delle coordinate (x,y)
+    mask = mask.unsqueeze(-1).expand_as(pred)          # (B, pred_len, 2)
+    diff = pred[mask] - target[mask]                   # 1-D tensor
+    return F.smooth_l1_loss(diff, torch.zeros_like(diff))
 
 class TrajectoryDataset(Dataset):
     def __init__(self, samples):
@@ -13,8 +24,12 @@ class TrajectoryDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        x, y, ann_tokens_window, is_aug = self.samples[idx]
-        return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), ann_tokens_window, is_aug
+      x, y, ann_tokens, is_aug, mask = self.samples[idx]
+      return (torch.tensor(x, dtype=torch.float32),
+              torch.tensor(y, dtype=torch.float32),
+              torch.tensor(mask, dtype=torch.bool),
+              ann_tokens,
+              is_aug)
 
 class TrajectoryLSTM(nn.Module):
     def __init__(self, input_size=2, hidden_size=64, num_layers=2, pred_len=7):
@@ -56,7 +71,7 @@ def trajectory_length(traj):
 # ----------------------------
 # Setup
 # ----------------------------
-def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'load'):
+def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'save'):
 
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -81,12 +96,13 @@ def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'load')
         total_loss = 0.0
 
         for batch in dataloader:
-            x, y, _, _ = batch
-            x, y = x.to(device), y.to(device)
+            x, y, mask, _, _ = batch                    # <- ora hai la mask
+            x = torch.nan_to_num(x, nan=0.0)            # nel dubbio
+            x, y, mask = x.to(device), y.to(device), mask.to(device)
 
             optimizer.zero_grad()
             pred = model(x)
-            loss = criterion(pred, y)
+            loss = masked_smooth_l1(pred, y, mask)      # << uso la loss mascherata
             loss.backward()
             optimizer.step()
 
@@ -98,10 +114,10 @@ def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'load')
         val_loss = 0.0
         with torch.no_grad():
             for val_batch in val_dataloader:
-                x_val, y_val, _, _ = val_batch
+                x_val, y_val,mask_val, _, _ = val_batch
                 x_val, y_val = x_val.to(device), y_val.to(device)
                 pred_val = model(x_val)
-                val_loss += criterion(pred_val, y_val).item()
+                val_loss += masked_smooth_l1(pred_val, y_val, mask_val.to(device)).item()
 
         avg_val_loss = val_loss / len(val_dataloader)
         print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
@@ -109,17 +125,17 @@ def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'load')
     # ----------------------------
     # Salvataggio predizioni finali (solo non augmentati)
     # ----------------------------
-    torch.save(model.state_dict(), 'model_weights.pth')
+    torch.save(model.state_dict(), 'model_weights_drop.pth')
   elif mode == 'load':
 
     # Ricrea il modello con gli stessi iperparametri usati in addestramento
     model = TrajectoryLSTM(input_size=2, hidden_size=64, num_layers=2, pred_len=7).to(device)
-    model.load_state_dict(torch.load('model_weights.pth'))
+    model.load_state_dict(torch.load('model_weights_drop.pth'))
 
   debug_predictions = []
   model.eval()
   with torch.no_grad():
-      for input_seq, target_seq, ann_tokens, is_aug in samples:
+      for input_seq, target_seq, ann_tokens, is_aug , mask in samples:
           if not is_aug:
               x = torch.tensor(input_seq, dtype=torch.float32).unsqueeze(0).to(device)
               y = torch.tensor(target_seq, dtype=torch.float32).unsqueeze(0).to(device)
@@ -128,6 +144,7 @@ def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'load')
                   'input': input_seq.tolist(),
                   'pred': pred[0].cpu().numpy().tolist(),
                   'gt': target_seq.tolist(),
+                  'mask': mask,  
                   'ann_tokens': ann_tokens
               })
 
@@ -137,11 +154,19 @@ def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'load')
   errors = []
 
   for pred in debug_predictions:
-      gt = np.array(pred['gt'])      # Ground truth trajectory (seq_len, 2)
-      pr = np.array(pred['pred'])    # Predicted trajectory (seq_len, 2)
+      gt   = np.array(pred['gt'])      # (7, 2)
+      pr   = np.array(pred['pred'])    # (7, 2)
+      mask = np.array(pred['mask'])    # (7,)
 
-      lengths.append(trajectory_length(gt))
-      errors.append(np.mean(np.linalg.norm(pr - gt, axis=1)))  # MAE per sequenza
+      valid_gt = gt[mask]
+      valid_pr = pr[mask]
+
+      if len(valid_gt) == 0:
+          continue  # niente da confrontare
+
+      lengths.append(trajectory_length(valid_gt))
+      errors.append(np.mean(np.linalg.norm(valid_pr - valid_gt, axis=1)))
+
 
   avg_length = np.mean(lengths)
   avg_mae = np.mean(errors)
