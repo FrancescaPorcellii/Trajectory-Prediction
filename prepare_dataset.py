@@ -37,7 +37,7 @@ def global_to_ego(ego_translation, ego_rotation_quat, obj_global_pos):
     pos_ego = r_inv.apply(vec)
     return pos_ego.tolist()
 
-def create_dataset(trucksc, ):
+def create_dataset(trucksc ):
   N = 10  # lunghezza della finestra temporale
 
 
