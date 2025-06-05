@@ -72,7 +72,7 @@ def create_dataset(trucksc, ):
 
           for ann_token in base_sample['anns']:
               ann = trucksc.get('sample_annotation', ann_token)
-              if 'vehicle.car' not in ann['category_name']:
+              if 'vehicle' not in ann['category_name']:
                   continue
               attr_tokens = ann.get('attribute_tokens', [])
               is_moving = any(trucksc.get('attribute', attr)['name'] == 'vehicle.moving'
