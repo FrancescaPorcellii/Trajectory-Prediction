@@ -1,12 +1,7 @@
 # 🚚 Trajectory Prediction in Truck Scenes
 
-
-
-> **Predict the next 7 positions of the nearest moving vehicle given the first 3 observations**
-> using the **TruckScenes‑Mini** dataset and a custom LSTM model.
-
-This repository supports the report:
-📄 *“Trajectory Prediction in Truck Scenes using LSTM under Incomplete Observations.”*
+**Predict the next 7 positions of the nearest moving vehicle given the first 3 observations**
+using the **TruckScenes‑Mini** dataset and a custom LSTM model.
 
 It includes:
 
