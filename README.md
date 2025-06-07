@@ -79,7 +79,7 @@ visualize_trajectory(trucksc, debug_preds,first_ann_token, mode="global")
 
 📍 Useful for understanding trajectory shape, especially for straight vs. curved motion.
 
-<img src="media/cartesian_plot.png" width="70%"/>
+<img src="media/drop_input_rettilineo.png" width="50%"/>
 
 ---
 
@@ -92,8 +92,7 @@ render_box(trucksc, pred_seq, matched_sample)
 ```
 
 📍 Ideal for observing spatial accuracy and vehicle positioning in the real scene.
-
-![](media/video.gif)
+<img src="media/video.gif" width="50%"/>
 
 ---
 
