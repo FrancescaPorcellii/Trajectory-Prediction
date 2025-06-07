@@ -65,20 +65,3 @@ python experiments/run.py --exp drop_input --epochs 50
 
 ---
 
-## 5 · Citation
-
-```bibtex
-@misc{porcelli2025lstm,
-  author       = {Francesca Porcelli},
-  title        = {Trajectory Prediction in Truck Scenes using LSTM under Incomplete Observations},
-  year         = {2025},
-  howpublished = {GitHub},
-  url          = {https://github.com/FrancescaPorcellii/Trajectory-Prediction}
-}
-```
-
----
-
-## 6 · Licence
-
-Released under the MIT License – see `LICENSE` for details.
