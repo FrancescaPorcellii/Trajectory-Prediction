@@ -1,5 +1,3 @@
-# Trajectory-Prediction
-
 # Trajectory Prediction in Truck Scenes
 
 ![](media/video.gif)
