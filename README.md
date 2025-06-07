@@ -10,11 +10,10 @@ This repository supports the report:
 
 It includes:
 
-* ✅ `Trajectory_Prediction.ipynb`: End‑to‑end Colab notebook (data prep → training → evaluation → visualization)
-* 🧠 Pretrained models for three experiment settings
-* 🛠 `train.py`: Unified script for training and evaluation
-* 🔧 Helper scripts for dataset parsing and plotting
-* 🗂 Preselected samples for easy qualitative evaluation
+*  `Trajectory_Prediction.ipynb`: End‑to‑end Colab notebook (data prep → training → evaluation → visualization)
+*  Pretrained models for three experiment settings
+*  `train.py`: Unified script for training and evaluation
+*  Helper scripts for dataset parsing and plotting
 
 ---
 
@@ -61,15 +60,10 @@ model, debug_preds = train_model(samples, num_epochs=100, batch_size=4, lr=0.001
 ---
 
 ## 3 · 📊 Visual Examples
-Here's the updated **Visual Examples** section in proper GitHub README format, with image placeholders and clear descriptions of the visualization functions:
-
----
-
-## 3 · 📊 Visual Examples
 
 This project provides three built-in visualization tools to better understand model performance:
 
-### 🟦 1. Cartesian Trajectory Plot
+###  1. Cartesian Trajectory Plot
 
 Visualizes the **past**, **ground-truth future**, and **predicted future** positions in the 2D cartesian space.
 
@@ -77,13 +71,12 @@ Visualizes the **past**, **ground-truth future**, and **predicted future** posit
 visualize_trajectory(trucksc, debug_preds,first_ann_token, mode="global")
 ```
 
-📍 Useful for understanding trajectory shape, especially for straight vs. curved motion.
 
 <img src="media/drop_input_rettilineo.png" width="50%"/>
 
 ---
 
-### 🟥 2. Image-based Box Overlay
+###  2. Image-based Box Overlay
 
 Renders the **ground-truth bounding boxes** and **predicted boxes** directly on the RGB image frame.
 
@@ -91,12 +84,11 @@ Renders the **ground-truth bounding boxes** and **predicted boxes** directly on 
 render_box(trucksc, pred_seq, matched_sample)
 ```
 
-📍 Ideal for observing spatial accuracy and vehicle positioning in the real scene.
 <img src="media/video.gif" width="50%"/>
 
 ---
 
-### 🟩 3. Full Expected Trajectory
+###  3. Full Expected Trajectory
 
 Draws the **complete predicted path** of the vehicle across all future frames.
 
@@ -104,7 +96,6 @@ Draws the **complete predicted path** of the vehicle across all future frames.
 render_trajectory(trucksc, matched_sample, pred_seq)
 ```
 
-📍 Useful for seeing how well the prediction aligns with the motion over time.
 
 <img src="media/curved.png" width="70%"/>
 
