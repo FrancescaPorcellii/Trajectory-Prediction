@@ -93,22 +93,17 @@ def plot_prediction_with_ego(input_seq, target_seq, pred_seq, ego_traj, title="G
     plt.axis('equal')
     plt.show()
 
-def get_cam_channel(trucksc, sample):
-        cam_channel = None
-        for sd_token in sample['data'].values():
-            sample_data = trucksc.get("sample_data", sd_token)
-            calibrated_sensor_token = sample_data['calibrated_sensor_token']
-            sensor_token = trucksc.get("calibrated_sensor", calibrated_sensor_token)['sensor_token']
-            sensor = trucksc.get("sensor", sensor_token)
-
-            if sensor['modality'].lower() == 'camera':
-                cam_channel = sensor['channel']
-                break
-
-        if cam_channel is None:
-            print(f"❌ Nessun canale camera trovato per il sample {sample['token']}")
-            return
-        return cam_channel
+def get_cam_channel(trucksc, anntoken):
+        ann_record = trucksc.get('sample_annotation', anntoken)
+        sample_record = trucksc.get('sample', ann_record['sample_token'])
+        cams = [key for key in sample_record['data'].keys() if 'CAMERA' in key]
+        for cam in cams:
+            _, boxes, _ = trucksc.get_sample_data(sample_record['data'][cam],
+                                                      box_vis_level=BoxVisibility.ANY,
+                                                      selected_anntokens=[anntoken])
+            if len(boxes) > 0:          # ➊ la box è visibile in questa camera
+                break                   # ➋ cam valido trovato → esci dal loop
+        return cam
 
 def visualize_trajectory(trucksc, debug_preds, first_ann_token, mode="Ego"):
     with open("metadata.json") as f:
@@ -151,7 +146,7 @@ def visualize_trajectory(trucksc, debug_preds, first_ann_token, mode="Ego"):
       ann = trucksc.get("sample_annotation", ann_tokens[0])
       sample = trucksc.get("sample", ann['sample_token'])
       
-      cam_channel = get_cam_channel(trucksc, sample)
+      cam_channel = get_cam_channel(trucksc, first_ann_token)
       all_poses = []
 
       for token in ann_tokens:
@@ -214,14 +209,14 @@ def transform_orientation(orientation_quat, ego_pose, sensor_calib):
     q_sensor = Quaternion(sensor_calib['rotation']).inverse * q_ego
     return q_sensor
 
-def render_gt_vs_prediction(trucksc, gt_ann_token, pred_xy, annotation_data):
+def render_gt_vs_prediction(trucksc, gt_ann_token, pred_xy, annotation_data, sample_t):
     gt_ann = trucksc.get('sample_annotation', gt_ann_token)
     sample_token = gt_ann['sample_token']
     sample = trucksc.get('sample', sample_token)
-    cam_channel = get_cam_channel(trucksc, sample)
+    cam_channel = get_cam_channel(trucksc, gt_ann_token)
     cam_token = sample['data'].get(cam_channel, None)
     if cam_token is None:
-        print(f"⚠️ Nessun dato per canale {cam_channel} nel sample {sample['token']}")
+        print(f"⚠️ Nessun dato per canale {cam_channel} nel sample {sample_t['token']}")
     cam_data = trucksc.get('sample_data', cam_token)
     calib = trucksc.get('calibrated_sensor', cam_data['calibrated_sensor_token'])
     cam_intrinsic = np.array(calib['camera_intrinsic'])
@@ -278,8 +273,13 @@ def render_gt_vs_prediction(trucksc, gt_ann_token, pred_xy, annotation_data):
     print(f"Box GT: {box_gt}")
     print(f"Box Prediction: {box_pred}")
     # Rendering
-    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-    trucksc.render_sample_data(cam_token, box_vis_level=BoxVisibility.ANY, ax=ax)
+    trucksc.render_annotation(gt_ann_token,
+                          box_vis_level=BoxVisibility.ANY,
+                          )   # NO 'ax' in questo caso
+
+    # 2. Poi recupera la figura/asse correnti
+    fig  = plt.gcf()
+    ax   = plt.gca()
 
     # Disegna box
     box_gt.render(ax, view=cam_intrinsic, normalize=True, colors=(np.array([1.0, 0.0, 0.0]),) * 3)
@@ -288,14 +288,14 @@ def render_gt_vs_prediction(trucksc, gt_ann_token, pred_xy, annotation_data):
     plt.title("GT (red) vs Prediction (green)")
     plt.tight_layout()
     plt.show()
-def render_box(trucksc, pred_seq, matched_sample):
+def render_box(trucksc, pred_seq, matched_sample, sample_t):
     with open("/content/man-truckscenes/man-truckscenes/v1.0-mini/sample_annotation.json") as f:
         annotation_data = json.load(f)
 
     for i in range(7):
         gt_token = matched_sample['ann_tokens'][3 + i]
         pred_xy = pred_seq[i].numpy()
-        render_gt_vs_prediction(trucksc, gt_token, pred_xy, annotation_data)
+        render_gt_vs_prediction(trucksc, gt_token, pred_xy, annotation_data, sample_t)
 
 
 def transform_to_sensor_frame(global_pos, ego_pose, sensor_calib):
@@ -318,7 +318,7 @@ def render_trajectory(trucksc, matched_sample, pred_seq):
     sample_token = gt_ann['sample_token']
     sample = trucksc.get('sample', sample_token)
 
-    cam_channel = get_cam_channel(trucksc, sample)
+    cam_channel = get_cam_channel(trucksc, gt_token)
     cam_token = sample['data'].get(cam_channel, None)
     if cam_token is None:
         print(f"⚠️ Camera {cam_channel} non trovata.")
