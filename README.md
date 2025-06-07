@@ -1,5 +1,3 @@
-# Trajectory-PredictionAdd commentMore actions
-
 # Trajectory Prediction in Truck Scenes
 
 ![](media/video.gif)
@@ -18,7 +16,7 @@ This repository accompanies the report *“Trajectory Prediction in Truck Scenes
 | Step                       | Command                                                                                                                                                                                                                                        |
 |---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **1. Clone repository**   | `!git clone https://github.com/FrancescaPorcellii/Trajectory-Prediction.git`                                                                                                                                                                  |
-| **2. Download dataset**   | ```bash<br>!wget https://man-truckscenes.s3.eu-central-1.amazonaws.com/release/mini/man-truckscenes_metadata_v1.0-mini.zip <br>!wget https://man-truckscenes.s3.eu-central-1.amazonaws.com/release/mini/man-truckscenes_sensordata_v1.0-mini.zip <br>!unzip "man-truckscenes_*.zip"``` |
+| **2. Download dataset**   | ```bash<br>!wget https://man-truckscenes.s3.eu-central-1.amazonaws.com/release/mini/man-truckscenes_metadata_v1.0-mini.zip \<br>!wget https://man-truckscenes.s3.eu-central-1.amazonaws.com/release/mini/man-truckscenes_sensordata_v1.0-mini.zip \<br>!unzip "man-truckscenes_*.zip"``` |
 | **3. Install dev-kit**    | `!pip install -U "truckscenes-devkit[all]"`                                                                                                                                                                                                    |
 | **4. Launch notebook**    | [Open in Colab](https://colab.research.google.com/github/FrancescaPorcellii/Trajectory-Prediction/blob/main/Trajectory_Prediction.ipynb)                                                                                                      |
 
@@ -65,22 +63,4 @@ python experiments/run.py --exp drop_input --epochs 50
 
 ![Prediction GIF](assets/prediction_demo.gif)
 
----
 
-## 5 · Citation
-
-```bibtex
-@misc{porcelli2025lstm,
-  author       = {Francesca Porcelli},
-  title        = {Trajectory Prediction in Truck Scenes using LSTM under Incomplete Observations},
-  year         = {2025},
-  howpublished = {GitHub},
-  url          = {https://github.com/FrancescaPorcellii/Trajectory-Prediction}
-}
-```
-
----
-
-## 6 · Licence
-
-Released under the MIT License – see `LICENSE` for details.
