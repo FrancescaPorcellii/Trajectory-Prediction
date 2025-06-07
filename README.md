@@ -1,6 +1,6 @@
 # 🚚 Trajectory Prediction in Truck Scenes
 
-![Demo Video](media/video.gif)
+
 
 > **Predict the next 7 positions of the nearest moving vehicle given the first 3 observations**
 > using the **TruckScenes‑Mini** dataset and a custom LSTM model.
@@ -61,27 +61,54 @@ model, debug_preds = train_model(samples, num_epochs=100, batch_size=4, lr=0.001
 ---
 
 ## 3 · 📊 Visual Examples
-
-Two annotation samples are provided one for a straight trajectory and another for a curved trajectory:
-
-<div align="center">
-  <img src="assets/standard_straight.png" width="45%" />
-  <img src="assets/drop_input_curved.png"  width="45%" />
-  <br>
-  <sub>🔵 Past · 🔴 Ground truth · 🟢 Prediction</sub>
-</div>
-
-You can also choose **any other annotation token** from the dataset and visualize it.
+Here's the updated **Visual Examples** section in proper GitHub README format, with image placeholders and clear descriptions of the visualization functions:
 
 ---
 
-## 🧠 Model Overview
+## 3 · 📊 Visual Examples
 
-* Architecture: LSTM-based predictor
-* Inputs: 3 past observations of the nearest moving agent
-* Outputs: 7 future predicted positions
-* Losses: Mean Squared Error (MSE), L1 Loss (optional)
-* Framework: PyTorch
+This project provides three built-in visualization tools to better understand model performance:
+
+### 🟦 1. Cartesian Trajectory Plot
+
+Visualizes the **past**, **ground-truth future**, and **predicted future** positions in the 2D cartesian space.
+
+```python
+visualize_trajectory(trucksc, debug_preds,first_ann_token, mode="global")
+```
+
+📍 Useful for understanding trajectory shape, especially for straight vs. curved motion.
+
+<img src="media/cartesian_plot.png" width="70%"/>
+
+---
+
+### 🟥 2. Image-based Box Overlay
+
+Renders the **ground-truth bounding boxes** and **predicted boxes** directly on the RGB image frame.
+
+```python
+render_box(trucksc, pred_seq, matched_sample)
+```
+
+📍 Ideal for observing spatial accuracy and vehicle positioning in the real scene.
+
+![](media/video.gif)
+
+---
+
+### 🟩 3. Full Expected Trajectory
+
+Draws the **complete predicted path** of the vehicle across all future frames.
+
+```python
+render_trajectory(trucksc, matched_sample, pred_seq)
+```
+
+📍 Useful for seeing how well the prediction aligns with the motion over time.
+
+<img src="media/curved.png" width="70%"/>
+
 
 ---
 
