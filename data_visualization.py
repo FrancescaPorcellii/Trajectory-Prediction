@@ -199,14 +199,14 @@ def transform_orientation(orientation_quat, ego_pose, sensor_calib):
     q_sensor = Quaternion(sensor_calib['rotation']).inverse * q_ego
     return q_sensor
 
-def render_gt_vs_prediction(trucksc, gt_ann_token, pred_xy, annotation_data, sample_t):
+def render_gt_vs_prediction(trucksc, gt_ann_token, pred_xy, annotation_data):
     gt_ann = trucksc.get('sample_annotation', gt_ann_token)
     sample_token = gt_ann['sample_token']
     sample = trucksc.get('sample', sample_token)
     cam_channel = get_cam_channel(trucksc, gt_ann_token)
     cam_token = sample['data'].get(cam_channel, None)
     if cam_token is None:
-        print(f"⚠️ No data for channel {cam_channel} in sample {sample_t['token']}")
+        print(f"⚠️ No data for channel {cam_channel} in sample {sample['token']}")
     cam_data = trucksc.get('sample_data', cam_token)
     calib = trucksc.get('calibrated_sensor', cam_data['calibrated_sensor_token'])
     cam_intrinsic = np.array(calib['camera_intrinsic'])
@@ -278,14 +278,14 @@ def render_gt_vs_prediction(trucksc, gt_ann_token, pred_xy, annotation_data, sam
     plt.title("GT (red) vs Prediction (green)")
     plt.tight_layout()
     plt.show()
-def render_box(trucksc, pred_seq, matched_sample, sample_t):
+def render_box(trucksc, pred_seq, matched_sample):
     with open("/content/man-truckscenes/man-truckscenes/v1.0-mini/sample_annotation.json") as f:
         annotation_data = json.load(f)
 
     for i in range(7):
         gt_token = matched_sample['ann_tokens'][3 + i]
         pred_xy = pred_seq[i].numpy()
-        render_gt_vs_prediction(trucksc, gt_token, pred_xy, annotation_data, sample_t)
+        render_gt_vs_prediction(trucksc, gt_token, pred_xy, annotation_data)
 
 
 def transform_to_sensor_frame(global_pos, ego_pose, sensor_calib):
