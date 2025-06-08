@@ -104,7 +104,7 @@ def get_cam_channel(trucksc, anntoken):
                 break                   
         return cam
 
-def visualize_trajectory(trucksc, debug_preds, first_ann_token, mode="Ego"):
+def visualize_trajectory(trucksc, debug_preds, first_ann_token):
     with open("metadata.json") as f:
         metadata = json.load(f)
 
@@ -138,47 +138,42 @@ def visualize_trajectory(trucksc, debug_preds, first_ann_token, mode="Ego"):
     print(f"Input: {input_seq.shape}, Target: {target_seq.shape}, Prediction: {pred_seq.shape}")
     print(f"Matched annotation tokens: {ann_tokens}")
 
-    if mode.lower() == "ego":
-        plot_prediction(input_seq, target_seq, pred_seq,
-                        title=f"[Ego] Prediction for annotation {first_ann_token}")
-    elif mode.lower() == "global":
-      ann = trucksc.get("sample_annotation", ann_tokens[0])
-      sample = trucksc.get("sample", ann['sample_token'])
-      
-      cam_channel = get_cam_channel(trucksc, first_ann_token)
-      all_poses = []
+    ann = trucksc.get("sample_annotation", ann_tokens[0])
+    sample = trucksc.get("sample", ann['sample_token'])
+    
+    cam_channel = get_cam_channel(trucksc, first_ann_token)
+    all_poses = []
 
-      for token in ann_tokens:
-          ann = trucksc.get("sample_annotation", token)
-          sample = trucksc.get("sample", ann['sample_token'])
-          
-          
-          cam_token = sample['data'].get(cam_channel, None)
-          if cam_token is None:
-              print(f"⚠️ No data for channel {cam_channel} in sample {sample['token']}")
-              continue
+    for token in ann_tokens:
+        ann = trucksc.get("sample_annotation", token)
+        sample = trucksc.get("sample", ann['sample_token'])
+        
+        
+        cam_token = sample['data'].get(cam_channel, None)
+        if cam_token is None:
+            print(f"⚠️ No data for channel {cam_channel} in sample {sample['token']}")
+            continue
 
-          cam_data = trucksc.get("sample_data", cam_token)
-          ego_pose = trucksc.get("ego_pose", cam_data['ego_pose_token'])
+        cam_data = trucksc.get("sample_data", cam_token)
+        ego_pose = trucksc.get("ego_pose", cam_data['ego_pose_token'])
 
-          all_poses.append(ego_pose)
+        all_poses.append(ego_pose)
 
-      if len(all_poses) != len(ann_tokens):
-          print(f"⚠️ Poses retrieved: {len(all_poses)} out of {len(ann_tokens)} annotations")
+    if len(all_poses) != len(ann_tokens):
+        print(f"⚠️ Poses retrieved: {len(all_poses)} out of {len(ann_tokens)} annotations")
 
-      
-      input_global = [ego_to_global([pt[0], pt[1], 0.0], all_poses[i]) for i, pt in enumerate(input_seq)]
-      target_global = [ego_to_global([pt[0], pt[1], 0.0], all_poses[i + len(input_seq)]) for i, pt in enumerate(target_seq)]
-      pred_global = [ego_to_global([pt[0], pt[1], 0.0], all_poses[i + len(input_seq)]) for i, pt in enumerate(pred_seq)]
+    
+    input_global = [ego_to_global([pt[0], pt[1], 0.0], all_poses[i]) for i, pt in enumerate(input_seq)]
+    target_global = [ego_to_global([pt[0], pt[1], 0.0], all_poses[i + len(input_seq)]) for i, pt in enumerate(target_seq)]
+    pred_global = [ego_to_global([pt[0], pt[1], 0.0], all_poses[i + len(input_seq)]) for i, pt in enumerate(pred_seq)]
 
-      
-      ego_positions = [np.array(pose['translation'][:2]) for pose in all_poses]
+    
+    ego_positions = [np.array(pose['translation'][:2]) for pose in all_poses]
 
-      
-      plot_prediction_with_ego(input_global, target_global, pred_global, ego_positions,
-                             title=f"[Global] Prediction for annotation {first_ann_token}")
-    else:
-            print(f"⚠️ Mode '{mode}' not supported. Use 'Ego' or 'Global'.")
+    
+    plot_prediction_with_ego(input_global, target_global, pred_global, ego_positions,
+                            title=f"[Global] Prediction for annotation {first_ann_token}")
+
     return matched_sample, input_seq, target_seq, pred_seq
 def create_box(center, size, orientation=[1, 0, 0, 0], name='prediction'):
     
