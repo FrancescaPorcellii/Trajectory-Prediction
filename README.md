@@ -12,22 +12,21 @@ It includes:
 
 ---
 
-## 1 · 🚀 Quick Start (Google Colab)
+## 1 · Quick Start (Google Colab)
 
 Run everything from [**this Colab notebook**](https://colab.research.google.com/github/FrancescaPorcellii/Trajectory-Prediction/blob/main/Trajectory_Prediction.ipynb).
 
-| Step                      | Command                                                                                                                                                                                                                                                                                                         |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1. Launch notebook**    | [Open in Colab](https://colab.research.google.com/github/FrancescaPorcellii/Trajectory-Prediction/blob/main/Trajectory_Prediction.ipynb)                                                                                                                                                                        |
-| **2. Clone repository**   | `!git clone https://github.com/FrancescaPorcellii/Trajectory-Prediction.git`                                                                                                                                                                                                                                    |
-| **3. Download dataset**   | Run this cell:`!wget https://man-truckscenes.s3.eu-central-1.amazonaws.com/release/mini/man-truckscenes_metadata_v1.0-mini.zip`<br>`!wget https://man-truckscenes.s3.eu-central-1.amazonaws.com/release/mini/man-truckscenes_sensordata_v1.0-mini.zip`<br>`!unzip "man-truckscenes_*.zip"` |
-| **4. Install dev-kit**    | `!pip install -U "truckscenes-devkit[all]"`                                                                                                                                                                                                                                                                     |
-| **5. Initialise dataset** | `from truckscenes import TruckScenes`<br>`trucksc = TruckScenes('v1.0-mini', '/content/man-truckscenes/man-truckscenes', verbose=True)` |
-
+| Step                      | Command                                                                                                                                                                                                                                          |
+|---------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **1. Launch notebook**    | [Open in Colab](https://colab.research.google.com/github/FrancescaPorcellii/Trajectory-Prediction/blob/main/Trajectory_Prediction.ipynb)                                                                                                        |
+| **2. Download dataset**   | ```bash\n!wget https://man-truckscenes.s3.eu-central-1.amazonaws.com/release/mini/man-truckscenes_metadata_v1.0-mini.zip\n!wget https://man-truckscenes.s3.eu-central-1.amazonaws.com/release/mini/man-truckscenes_sensordata_v1.0-mini.zip\n!unzip "man-truckscenes_*.zip"``` |
+| **3. Install dev-kit**    | `!pip install -U "truckscenes-devkit[all]"`                                                                                                                                                                                                      |
+| **4. Initialise dataset** | ```python\nfrom truckscenes import TruckScenes\ntrucksc = TruckScenes('v1.0-mini', '/content/man-truckscenes/man-truckscenes', verbose=True)```                                                                                                  |
+| **5. Clone repository**   | `!git clone https://github.com/FrancescaPorcellii/Trajectory-Prediction.git`                                                                                                                                                                     |
 
 ---
 
-## 2 · 🧪 Experiments & Training
+## 2 · Experiments & Training
 
 This project explores **three experimental setups**:
 
@@ -39,13 +38,13 @@ This project explores **three experimental setups**:
 
 You can use the unified `train.py` script to either train a model from scratch or load pretrained models:
 
-### ▶ Train a new model
+###  Train a new model
 
 ```bash
 model, debug_preds = train_model(samples, num_epochs=100, batch_size=4, lr=0.001, mode = "save", drop = 'target')
 ```
 
-### 🔁 Load and evaluate pretrained model
+###  Load and evaluate pretrained model
 
 ```bash
 model, debug_preds = train_model(samples, num_epochs=100, batch_size=4, lr=0.001, mode = "load", drop = 'target')
@@ -55,7 +54,7 @@ model, debug_preds = train_model(samples, num_epochs=100, batch_size=4, lr=0.001
 
 ---
 
-## 3 · 📊 Visual Examples
+## 3 · Visual Examples
 
 This project provides three built-in visualization tools to better understand model performance:
 
