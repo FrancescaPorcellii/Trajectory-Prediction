@@ -16,13 +16,13 @@ def augment_window(window, noise_std=0.1, translation_range=0.5):
 
         new_frame['translation'] = [*noisy_pos, z]
 
-        # Mantieni il vero annotation_token (per riferimento) ma indica che è augmentato
+        
         new_frame['is_augmented'] = True
 
-        # Opzionalmente: salva anche il token reale se vuoi
+        
         new_frame['original_annotation_token'] = frame['annotation_token']
 
-        # Annulla il valore se vuoi evitare errori diretti col renderer
+        
         new_frame['annotation_token'] = frame['annotation_token']+"_"
 
         augmented.append(new_frame)
@@ -30,7 +30,6 @@ def augment_window(window, noise_std=0.1, translation_range=0.5):
     return augmented
 
 def global_to_ego(ego_translation, ego_rotation_quat, obj_global_pos):
-    # ego_rotation_quat: [w, x, y, z]
     r = R.from_quat([ego_rotation_quat[1], ego_rotation_quat[2], ego_rotation_quat[3], ego_rotation_quat[0]])
     r_inv = r.inv()
     vec = np.array(obj_global_pos) - np.array(ego_translation)
@@ -38,30 +37,23 @@ def global_to_ego(ego_translation, ego_rotation_quat, obj_global_pos):
     return pos_ego.tolist()
 
 def create_dataset(trucksc ):
-  N = 10  # lunghezza della finestra temporale
-
-
+  N = 10  
   trajectory_data = []
   augmented_data = []
-
-  num_aug = 3  # quante augmentazioni per finestra
-
+  num_aug = 3  
   for scene_idx, scene in enumerate(trucksc.scene):
       sample_token = scene['first_sample_token']
       sample_sequence = []
 
-      # Raccogli tutti i sample nella scena
       while sample_token:
           sample = trucksc.get('sample', sample_token)
           sample_sequence.append(sample)
           sample_token = sample['next']
 
-      # Scorri la scena frame per frame
       for i in range(len(sample_sequence) - N + 1):
           window = sample_sequence[i:i + N]
           base_sample = window[0]
 
-          # Trova il veicolo "car + moving" più vicino nel primo frame
           nearest = None
           min_dist = float('inf')
 
@@ -92,7 +84,7 @@ def create_dataset(trucksc ):
           traj = []
           valid = True
 
-          # Verifica presenza di quell'istanza nei frame successivi
+          
           for sample in window:
               found = False
               for ann_token in sample['anns']:
@@ -124,16 +116,17 @@ def create_dataset(trucksc ):
                   break
 
           if valid:
-              trajectory_data.append(traj)  # ogni elemento è una finestra da N frame
+              trajectory_data.append(traj) 
   for traj in trajectory_data:
-      augmented_data.append(traj)  # finestra originale
+      augmented_data.append(traj)  
       for _ in range(num_aug):
           aug_traj = augment_window(traj)
           augmented_data.append(aug_traj)
-  # Salvataggio
+  
   with open('nearest_vehicle_trajectories.json', 'w') as f:
       json.dump(trajectory_data, f, indent=2)
   with open('nearest_vehicle_trajectories_augmented.json', 'w') as f:
       json.dump(augmented_data, f, indent=2)
-  print(f"✅ Salvate {len(trajectory_data)} finestre da {N} frame con veicolo più vicino moving")
-  print(f"✅ Salvate {len(augmented_data)} finestre da {N} frame con veicolo più vicino moving (augmented {num_aug}x)")
+  print(f"✅ Saved {len(trajectory_data)} windows of {N} frames with the closest vehicle moving")
+  print(f"✅ Saved {len(augmented_data)} windows of {N} frames with the closest vehicle moving (augmented {num_aug}x)")
+

@@ -7,7 +7,6 @@ from truckscenes.utils.geometry_utils import view_points, transform_matrix, BoxV
 from truckscenes.utils.data_classes import Box
 from PIL import Image
 def ego_to_global(ego_pos, ego_pose):
-    """Converte coordinate da ego vehicle a global frame."""
     ego_rot = Quaternion(ego_pose['rotation'])
     ego_trans = np.array(ego_pose['translation'])
     rotated = ego_rot.rotate(ego_pos)
@@ -25,7 +24,7 @@ def plot_prediction(input_seq, target_seq, pred_seq, title="Global Coordinate Tr
 
         plt.plot(points[:, 0], points[:, 1], linestyle=linestyle, color=color, label=label)
 
-        # Calcola vettori direzionali
+        
         dx = np.diff(points[:, 0])
         dy = np.diff(points[:, 1])
         x = points[:-1, 0]
@@ -54,10 +53,10 @@ def plot_prediction(input_seq, target_seq, pred_seq, title="Global Coordinate Tr
 
 
 def is_augmented(sample_ann_token):
-    # sample_ann_token è un dict oppure una stringa/null
+    
     if isinstance(sample_ann_token, dict):
         return sample_ann_token.get('is_augmented', False)
-    return False  # se è una stringa reale non è augmented
+    return False  
 def plot_prediction_with_ego(input_seq, target_seq, pred_seq, ego_traj, title="Global Coordinate Trajectory"):
     input_seq = np.array(input_seq)
     target_seq = np.array(target_seq)
@@ -101,8 +100,8 @@ def get_cam_channel(trucksc, anntoken):
             _, boxes, _ = trucksc.get_sample_data(sample_record['data'][cam],
                                                       box_vis_level=BoxVisibility.ANY,
                                                       selected_anntokens=[anntoken])
-            if len(boxes) > 0:          # ➊ la box è visibile in questa camera
-                break                   # ➋ cam valido trovato → esci dal loop
+            if len(boxes) > 0:          
+                break                   
         return cam
 
 def visualize_trajectory(trucksc, debug_preds, first_ann_token, mode="Ego"):
@@ -128,7 +127,7 @@ def visualize_trajectory(trucksc, debug_preds, first_ann_token, mode="Ego"):
             break
 
     if matched_sample is None:
-        print(f"❌ Nessuna predizione trovata contenente il token {first_ann_token}")
+        print(f"❌ No prediction found containing the token {first_ann_token}")
         return
 
     input_seq = torch.tensor(matched_sample['input'])
@@ -153,10 +152,10 @@ def visualize_trajectory(trucksc, debug_preds, first_ann_token, mode="Ego"):
           ann = trucksc.get("sample_annotation", token)
           sample = trucksc.get("sample", ann['sample_token'])
           
-          # Prendi il sample_data associato (es. camera)
+          
           cam_token = sample['data'].get(cam_channel, None)
           if cam_token is None:
-              print(f"⚠️ Nessun dato per canale {cam_channel} nel sample {sample['token']}")
+              print(f"⚠️ No data for channel {cam_channel} in sample {sample['token']}")
               continue
 
           cam_data = trucksc.get("sample_data", cam_token)
@@ -165,33 +164,29 @@ def visualize_trajectory(trucksc, debug_preds, first_ann_token, mode="Ego"):
           all_poses.append(ego_pose)
 
       if len(all_poses) != len(ann_tokens):
-          print(f"⚠️ Pose recuperate: {len(all_poses)} su {len(ann_tokens)} annotations")
+          print(f"⚠️ Poses retrieved: {len(all_poses)} out of {len(ann_tokens)} annotations")
 
-      # Conversione a global
+      
       input_global = [ego_to_global([pt[0], pt[1], 0.0], all_poses[i]) for i, pt in enumerate(input_seq)]
       target_global = [ego_to_global([pt[0], pt[1], 0.0], all_poses[i + len(input_seq)]) for i, pt in enumerate(target_seq)]
       pred_global = [ego_to_global([pt[0], pt[1], 0.0], all_poses[i + len(input_seq)]) for i, pt in enumerate(pred_seq)]
 
-      # Estrai anche traiettoria dell'ego vehicle
+      
       ego_positions = [np.array(pose['translation'][:2]) for pose in all_poses]
 
-      # Chiama plot
+      
       plot_prediction_with_ego(input_global, target_global, pred_global, ego_positions,
                              title=f"[Global] Prediction for annotation {first_ann_token}")
     else:
-            print(f"⚠️ Modalità '{mode}' non supportata. Usa 'Ego' o 'Global'.")
+            print(f"⚠️ Mode '{mode}' not supported. Use 'Ego' or 'Global'.")
     return matched_sample, input_seq, target_seq, pred_seq
 def create_box(center, size, orientation=[1, 0, 0, 0], name='prediction'):
-    """
-    Crea una box nello stile NuScenes.
-    """
+    
     return Box(center=center, size=[size['width'], size['length'], size['height']],
                orientation=Quaternion(orientation), name=name)
 
 def transform_global_to_sensor(global_pos, ego_pose, calibrated_sensor):
-    """
-    Trasforma coordinate globali in coordinate camera.
-    """
+    
     # Global -> Ego
     translation_ego = np.array(global_pos) - np.array(ego_pose['translation'])
     rotation_ego = Quaternion(ego_pose['rotation']).inverse.rotate(translation_ego)
@@ -202,7 +197,7 @@ def transform_global_to_sensor(global_pos, ego_pose, calibrated_sensor):
 
     return rotation_sensor
 
-# Fix orientazione box: va trasformata da global ➝ ego ➝ sensor
+
 def transform_orientation(orientation_quat, ego_pose, sensor_calib):
     q_global = Quaternion(orientation_quat)
     q_ego = Quaternion(ego_pose['rotation']).inverse * q_global
@@ -216,7 +211,7 @@ def render_gt_vs_prediction(trucksc, gt_ann_token, pred_xy, annotation_data, sam
     cam_channel = get_cam_channel(trucksc, gt_ann_token)
     cam_token = sample['data'].get(cam_channel, None)
     if cam_token is None:
-        print(f"⚠️ Nessun dato per canale {cam_channel} nel sample {sample_t['token']}")
+        print(f"⚠️ No data for channel {cam_channel} in sample {sample_t['token']}")
     cam_data = trucksc.get('sample_data', cam_token)
     calib = trucksc.get('calibrated_sensor', cam_data['calibrated_sensor_token'])
     cam_intrinsic = np.array(calib['camera_intrinsic'])
@@ -242,7 +237,7 @@ def render_gt_vs_prediction(trucksc, gt_ann_token, pred_xy, annotation_data, sam
 
     size = get_box_size(gt_ann_token, annotation_data)
     if size is None:
-        print(f"Dimensioni box non trovate per {gt_ann_token}")
+        print(f"Box dimensions not found for {gt_ann_token}")
         return
 
     # GT Box
@@ -258,11 +253,11 @@ def render_gt_vs_prediction(trucksc, gt_ann_token, pred_xy, annotation_data, sam
     )
 
     # Prediction Box
-    pred_ego = [pred_xy[0], pred_xy[1], 0.0]  # z non importa, usiamo quella della GT
+    pred_ego = [pred_xy[0], pred_xy[1], 0.0]  
     pred_pos_global = ego_to_global(pred_ego, ego_pose)
-    pred_pos_global[2] = center_global_gt[2]  # forza z uguale alla GT
+    pred_pos_global[2] = center_global_gt[2]  
     center_sensor_pred = transform_to_sensor_frame(pred_pos_global, ego_pose, calib)
-    orientation_sensor_pred = orientation_sensor_gt  # supponiamo stessa orientazione per ora
+    orientation_sensor_pred = orientation_sensor_gt  
 
     box_pred = Box(
         center=center_sensor_pred,
@@ -272,16 +267,16 @@ def render_gt_vs_prediction(trucksc, gt_ann_token, pred_xy, annotation_data, sam
     )
     print(f"Box GT: {box_gt}")
     print(f"Box Prediction: {box_pred}")
-    # Rendering
+    
     trucksc.render_annotation(gt_ann_token,
                           box_vis_level=BoxVisibility.ANY,
-                          )   # NO 'ax' in questo caso
+                          )   
 
-    # 2. Poi recupera la figura/asse correnti
+    
     fig  = plt.gcf()
     ax   = plt.gca()
 
-    # Disegna box
+    
     box_gt.render(ax, view=cam_intrinsic, normalize=True, colors=(np.array([1.0, 0.0, 0.0]),) * 3)
     box_pred.render(ax, view=cam_intrinsic, normalize=True, colors=(np.array([0.0, 1.0, 0.0]),) * 3)
 
@@ -311,8 +306,6 @@ def transform_to_sensor_frame(global_pos, ego_pose, sensor_calib):
     return pos_sensor
 
 def render_trajectory(trucksc, matched_sample, pred_seq):
-    
-    # Usa il primo frame come riferimento
     gt_token = matched_sample['ann_tokens'][3]
     gt_ann = trucksc.get('sample_annotation', gt_token)
     sample_token = gt_ann['sample_token']
@@ -341,7 +334,7 @@ def render_trajectory(trucksc, matched_sample, pred_seq):
       gt_ann = trucksc.get('sample_annotation', gt_token)
       center_global_gt = gt_ann['translation']
 
-      # Ottieni l'ego_pose corrispondente al frame i
+      
       sample_token = gt_ann['sample_token']
       sample_i = trucksc.get('sample', sample_token)
       cam_token_i = sample_i['data'].get(cam_channel, None)
@@ -352,7 +345,7 @@ def render_trajectory(trucksc, matched_sample, pred_seq):
       gt_sensor = transform_to_sensor_frame(center_global_gt, ego_pose, calib)
       gt_points_sensor.append(gt_sensor)
 
-      # Pred ➝ Global (da ego i) ➝ Sensor
+      # Pred ➝ Global  ➝ Sensor
       pred_xy = pred_seq[i].numpy()
       pred_ego = [pred_xy[0], pred_xy[1], 0.0]
       pred_global = ego_to_global(pred_ego, ego_pose_i)
@@ -360,16 +353,16 @@ def render_trajectory(trucksc, matched_sample, pred_seq):
       pred_sensor = transform_to_sensor_frame(pred_global, ego_pose, calib)
       pred_points_sensor.append(pred_sensor)
 
-    # Proietta su immagine
+    
     gt_img = view_points(np.array(gt_points_sensor).T, cam_intrinsic, normalize=True)
     pred_img = view_points(np.array(pred_points_sensor).T, cam_intrinsic, normalize=True)
 
-    # Disegna
+
     ax.plot(gt_img[0, :], gt_img[1, :], 'ro-', label='GT Trajectory')
     ax.plot(pred_img[0, :], pred_img[1, :], 'go-', label='Prediction Trajectory')
 
     ax.legend()
-    plt.title("Traiettoria: Ground Truth (rosso) vs Predizione (verde)")
+    plt.title("Trajectory: Ground Truth (red) vs Prediction (green)")
     plt.tight_layout()
     plt.show()
 

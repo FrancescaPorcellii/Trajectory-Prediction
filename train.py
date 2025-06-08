@@ -71,9 +71,6 @@ def trajectory_length(traj):
     dists = np.linalg.norm(diffs, axis=1)
     return np.sum(dists)
 
-# ----------------------------
-# Setup
-# ----------------------------
 def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'load', drop = 'no'):
 
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -149,9 +146,7 @@ def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'load',
         avg_val_loss = val_loss / len(val_dataloader)
         print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
 
-    # ----------------------------
-    # Salvataggio predizioni finali (solo non augmentati)
-    # ----------------------------
+   
     if drop == 'no':
       torch.save(model.state_dict(), 'models/model_weights.pth')
     elif drop == 'target':
@@ -160,7 +155,7 @@ def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'load',
       torch.save(model.state_dict(), 'models/model_weights_drop_input.pth')
   elif mode == 'load':
 
-    # Ricrea il modello con gli stessi iperparametri usati in addestramento
+    
     model = TrajectoryLSTM(input_size=2, hidden_size=64, num_layers=2, pred_len=7).to(device)
     if drop == 'no':
       model.load_state_dict(torch.load('models/model_weights.pth'))
@@ -217,23 +212,22 @@ def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'load',
   errors = []
   if drop == 'no':
     for pred in debug_predictions:
-        gt = np.array(pred['gt'])      # Ground truth trajectory (seq_len, 2)
-        pr = np.array(pred['pred'])    # Predicted trajectory (seq_len, 2)
+        gt = np.array(pred['gt'])      
+        pr = np.array(pred['pred'])    
 
         lengths.append(trajectory_length(gt))
-        errors.append(np.mean(np.linalg.norm(pr - gt, axis=1)))  # MAE per sequenza
+        errors.append(np.mean(np.linalg.norm(pr - gt, axis=1)))  
   else:
     for pred in debug_predictions:
-        gt   = np.array(pred['gt'])      # (7, 2)
-        pr   = np.array(pred['pred'])    # (7, 2)
-        mask = np.array(pred['mask'])    # (7,)
+        gt   = np.array(pred['gt'])     
+        pr   = np.array(pred['pred'])    
+        mask = np.array(pred['mask'])    
 
         valid_gt = gt[mask]
         valid_pr = pr[mask]
 
         if len(valid_gt) == 0:
-            continue  # niente da confrontare
-
+            continue  
         lengths.append(trajectory_length(valid_gt))
         errors.append(np.mean(np.linalg.norm(valid_pr - valid_gt, axis=1)))  
   avg_length = np.mean(lengths)
@@ -241,15 +235,12 @@ def train_model(samples, num_epochs=50, batch_size= 4, lr= 0.001, mode = 'load',
 
   accuratezza_pct = (1 - (avg_mae / avg_length)) * 100
 
-  print(f"Lunghezza media traiettorie: {avg_length:.4f}")
-  print(f"MAE medio: {avg_mae:.4f}")
-  print(f"Accuratezza percentuale: {accuratezza_pct:.2f}%")
+  print(f"Average trajectory length: {avg_length:.4f}")
+  print(f"Mean Absolute Error (MAE): {avg_mae:.4f}")
+  print(f"Accuracy percentage: {accuratezza_pct:.2f}%")
 
-  # ----------------------------
-  # Verifica conteggio
-  # ----------------------------
   expected = sum(1 for s in samples if not s[3])
   actual = len(debug_predictions)
-  print(f"\nPredizioni salvate: {actual} / {expected} (non augmentati)\n")
-  assert actual == expected, "⚠️ Mismatch tra sample non augmentati e predizioni salvate!"
+  print(f"\nSaved predictions: {actual} / {expected} (non-augmented)\n")
+  assert actual == expected, "⚠️ Mismatch between non-augmented samples and saved predictions!"
   return model, debug_predictions
